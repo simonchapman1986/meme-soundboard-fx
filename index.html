@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Sound FX Beat Pad</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      box-sizing: border-box;
+    }
+    body {
+      background: #000;
+      color: #fff;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: row;
+    }
+    /* Left Column: Controls */
+    #controlsColumn {
+      width: 220px;
+      padding: 20px;
+      border-right: 2px solid #444;
+      box-sizing: border-box;
+    }
+    #controlsColumn h1 {
+      margin: 0 0 20px;
+      font-size: 20px;
+    }
+    /* Help Button and Info Box */
+    #helpButton {
+      width: 100%;
+      padding: 8px;
+      background: #444;
+      border: none;
+      border-radius: 5px;
+      color: #fff;
+      cursor: pointer;
+      margin-bottom: 10px;
+    }
+    #helpBox {
+      display: none;
+      background: #111;
+      border: 2px solid #444;
+      border-radius: 5px;
+      padding: 15px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      text-align: left;
+      z-index: 1000;
+      position: relative;
+    }
+    #helpBox h3 {
+      margin-top: 0;
+    }
+    /* Two-Column Controls Grid */
+    .controlsGrid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .controlItem {
+      text-align: center;
+    }
+    canvas.knob {
+      background: #222;
+      border: 1px solid #444;
+      border-radius: 50%;
+      cursor: pointer;
+      display: block;
+      margin: 0 auto;
+    }
+    .controlLabel {
+      font-size: 12px;
+      margin-top: 4px;
+    }
+    button.controlButton, select.controlSelect {
+      width: 100%;
+      padding: 8px;
+      border: none;
+      border-radius: 5px;
+      background: #444;
+      color: #fff;
+      cursor: pointer;
+    }
+    /* Waveform Visualization in Left Pane */
+    #audioCanvas {
+      width: 100%;
+      height: 150px;
+      background: #111;
+      border: 2px solid #333;
+      border-radius: 5px;
+      margin-top: 10px;
+    }
+    /* Right Column: Pads and Saved Recordings */
+    #mainColumn {
+      flex: 1;
+      padding: 20px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+    #searchInput {
+      width: 100%;
+      padding: 6px;
+      margin-bottom: 10px;
+      box-sizing: border-box;
+      border: 1px solid #444;
+      border-radius: 5px;
+      background: #222;
+      color: #fff;
+    }
+    /* Grid layout for pads */
+    #pad-container {
+      flex: 1;
+      overflow-y: auto;
+      border-bottom: 1px solid #444;
+      padding-bottom: 10px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 15px;
+    }
+    .pad {
+      position: relative;
+      width: 120px;
+      height: 120px;
+      background: #111;
+      border: 2px solid #333;
+      border-radius: 10px;
+      overflow: hidden;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+    .pad.active {
+      animation: pulsate 1s infinite;
+      box-shadow: 0 0 20px 4px rgba(255,255,255,0.8);
+    }
+    @keyframes pulsate {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
+    /* Scrolling text carousel for pad labels */
+    .pad-label {
+      position: absolute;
+      bottom: 0;
+      width: 100%;
+      overflow: hidden;
+      white-space: nowrap;
+      font-size: 12px;
+      background: rgba(0, 0, 0, 0.6);
+      color: #fff;
+      box-sizing: border-box;
+    }
+    .pad-label span {
+      display: inline-block;
+      padding-left: 100%;
+      animation: scrollText 10s linear infinite;
+    }
+    @keyframes scrollText {
+      0% { transform: translateX(0); }
+      50% { transform: translateX(-50%); }
+      100% { transform: translateX(0); }
+    }
+    /* Solo/Mute Button */
+    .soloButton {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      background: #444;
+      border: none;
+      color: #fff;
+      font-size: 10px;
+      padding: 2px 4px;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    /* Saved Recordings: Minimalist Division */
+    #saved-recordings-container {
+      margin-top: 10px;
+      padding-top: 5px;
+    }
+    #saved-recordings-container h2 {
+      margin: 0;
+      font-size: 16px;
+      color: #aaa;
+      border-bottom: 1px solid #444;
+      padding-bottom: 5px;
+    }
+    .saved-pad {
+      background: #660066 !important;
+    }
+  </style>
+</head>
+<body>
+  <!-- Left Column: Controls & Waveform -->
+  <div id="controlsColumn">
+    <h1>Sound FX Beat Pad</h1>
+    <button id="helpButton" class="controlButton">Help</button>
+    <div id="helpBox">
+      <h3>Help & Hotkeys</h3>
+      <p><strong>Pad Triggers:</strong> Each pad corresponds to an MP3 file. Hotkeys (Q, W, E, etc.) are assigned.</p>
+      <p><strong>Playback:</strong> Tap to play. Tap again within 1.5s to restart; after 1.5s to stop. Tapping a different pad stops the current track (single-track) or adds to playback (multi-track).</p>
+      <p><strong>Global & Mixer Controls:</strong> Adjust Global Volume, Pan, Delay, Reverb, and EQ using the knobs below. These update in real time.</p>
+      <p><strong>Recording:</strong> Press Record (or R key) to toggle recording. When stopped, you’ll be prompted to name the sequence, which then appears as a saved recording pad.</p>
+      <p><strong>Multi-Track Mode:</strong> Toggle with M key; press S key to sync tracks.</p>
+      <p><strong>Solo/Mute:</strong> Each pad has a Solo button to isolate or mute tracks.</p>
+      <p><strong>Other Hotkeys:</strong><br>
+         - Record: R key<br>
+         - Multi-Track: M key<br>
+         - Sync Tracks: S key</p>
+      <p><strong>Help Toggle:</strong> Click the Help button to show/hide this box.</p>
+    </div>
+    <div class="controlsGrid">
+      <div class="controlItem">
+        <canvas id="volumeKnob" class="knob" width="50" height="50"></canvas>
+        <div class="controlLabel">Global Volume</div>
+      </div>
+      <div class="controlItem">
+        <canvas id="panKnob" class="knob" width="50" height="50"></canvas>
+        <div class="controlLabel">Global Pan</div>
+      </div>
+      <div class="controlItem">
+        <canvas id="delayKnob" class="knob" width="50" height="50"></canvas>
+        <div class="controlLabel">Global Delay</div>
+      </div>
+      <div class="controlItem">
+        <canvas id="reverbKnob" class="knob" width="50" height="50"></canvas>
+        <div class="controlLabel">Global Reverb</div>
+      </div>
+      <div class="controlItem">
+        <canvas id="eqLowKnob" class="knob" width="50" height="50"></canvas>
+        <div class="controlLabel">EQ Low</div>
+      </div>
+      <div class="controlItem">
+        <canvas id="eqMidKnob" class="knob" width="50" height="50"></canvas>
+        <div class="controlLabel">EQ Mid</div>
+      </div>
+      <div class="controlItem">
+        <canvas id="eqHighKnob" class="knob" width="50" height="50"></canvas>
+        <div class="controlLabel">EQ High</div>
+      </div>
+      <div class="controlItem">
+        <button id="repeatButton" class="controlButton">Repeat: Off</button>
+      </div>
+      <div class="controlItem">
+        <button id="multiTrackButton" class="controlButton">Multi-Track: Off</button>
+      </div>
+      <div class="controlItem">
+        <button id="syncTracksButton" class="controlButton">Sync Tracks</button>
+      </div>
+      <div class="controlItem">
+        <label for="themeSelect" class="controlLabel">Theme:</label>
+        <select id="themeSelect" class="controlSelect">
+          <option value="neon" selected>Neon</option>
+          <option value="blue">Blue</option>
+          <option value="green">Green</option>
+          <option value="red">Red</option>
+        </select>
+      </div>
+      <div class="controlItem" style="grid-column: span 2;">
+        <button id="recordButton" class="controlButton">Record</button>
+        <span id="recordIndicator"></span>
+      </div>
+    </div>
+    <!-- Waveform Visualization in Left Pane -->
+    <canvas id="audioCanvas" width="200" height="150"></canvas>
+  </div>
+
+  <!-- Right Column: Pads and Saved Recordings -->
+  <div id="mainColumn">
+    <input type="text" id="searchInput" placeholder="Filter sounds...">
+    <div id="pad-container"></div>
+    <div id="saved-recordings-container">
+      <h2>Saved Recordings</h2>
+      <div id="saved-recordings"></div>
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      // --- Global variable for key mapping ---
+      var keyMap = "qwertyuiopasdfghjklzxcvbnm".split('');
+      
+      // Function to return a color based on the selected theme.
+      function getPadColor() {
+        var theme = themeSelect.value;
+        if (theme === "neon") {
+          var hue = Math.floor(Math.random() * 360);
+          return "hsl(" + hue + ", 100%, 50%)";
+        } else if (theme === "blue") {
+          return "hsl(210, 80%, 50%)";
+        } else if (theme === "green") {
+          return "hsl(120, 80%, 50%)";
+        } else if (theme === "red") {
+          return "hsl(0, 80%, 50%)";
+        }
+        return "#111";
+      }
+      
+      // Hard-coded list of MP3 files.
+      var mp3Files = [
+        "pokemon-theme.mp3",
+        "gta-wasted.mp3",
+        "pokemon_theme_the_fart1.mp3",
+        "129-received-an-item.mp3",
+        "happy-birthday-pokemon.mp3",
+        "roblox-death-sound_1.mp3",
+        "9000.mp3",
+        "hello-there.mp3",
+        "shut-up-meg.mp3",
+        "aint-nobody-got-time-for-that_1.mp3",
+        "i-am-speed.mp3",
+        "somebody-toucha-my-spaghet.mp3",
+        "air_horn.mp3",
+        "ichooseyou.mp3",
+        "surprise-motherfucker.mp3",
+        "airhorn.mp3",
+        "to-be-continued.mp3",
+        "among-us.mp3",
+        "its-pikachu-short.mp3",
+        "videoplayback_1_trim_1-audiotrimmer.mp3",
+        "and-his-name-is-john-cena.mp3",
+        "jeepersmister.mp3",
+        "what-da-dog-doin.mp3",
+        "bonk.mp3",
+        "jesus-christ-kid.mp3",
+        "megalovania.mp3",
+        "metal_pipe.mp3",
+        "why-are-you-running.mp3",
+        "deez-nuts.mp3",
+        "nani.mp3",
+        "no-god-please-no.mp3",
+        "windows_error.mp3",
+        "goat_scream.mp3",
+        "oh-my-god-wow.mp3",
+        "you-were-close_bKTTOg6.mp3",
+        "god-dammit-augghhh.mp3",
+        "pokeballin3.mp3"
+      ];
+
+      // Global variables.
+      var currentAudio = null;
+      var playingAudios = [];
+      var currentPad = null;
+      var lastTapTime = 0;
+      var isRepeating = false;
+      var multiTrackMode = false;
+      var isRecording = false;
+      var recordingSequence = [];
+      var recordingStartTime = 0;
+      var savedRecordings = [];
+      var globalVolume = 1;
+      var globalPan = 0;
+      var globalDelay = 0;
+      var globalReverb = 0;
+      var eqLow = 0, eqMid = 0, eqHigh = 0;
+
+      // Audio Context and Global Effects Chain.
+      var audioContext, analyser, dataArray, bufferLength;
+      var masterGainNode, panNode, delayNode, reverbNode, eqLowNode, eqMidNode, eqHighNode;
+      var audioCanvas = document.getElementById("audioCanvas");
+      var canvasCtx = audioCanvas.getContext("2d");
+
+      // DOM Elements.
+      var padContainer = document.getElementById("pad-container");
+      var savedRecordingsContainer = document.getElementById("saved-recordings");
+      var searchInput = document.getElementById("searchInput");
+      var recordButton = document.getElementById("recordButton");
+      var recordIndicator = document.getElementById("recordIndicator");
+      var repeatButton = document.getElementById("repeatButton");
+      var multiTrackButton = document.getElementById("multiTrackButton");
+      var syncTracksButton = document.getElementById("syncTracksButton");
+      var themeSelect = document.getElementById("themeSelect");
+      var helpButton = document.getElementById("helpButton");
+      var helpBox = document.getElementById("helpBox");
+
+      // Mixer Knobs.
+      var volumeKnob = document.getElementById("volumeKnob"), volumeKnobCtx = volumeKnob.getContext("2d");
+      var panKnob = document.getElementById("panKnob"), panKnobCtx = panKnob.getContext("2d");
+      var delayKnob = document.getElementById("delayKnob"), delayKnobCtx = delayKnob.getContext("2d");
+      var reverbKnob = document.getElementById("reverbKnob"), reverbKnobCtx = reverbKnob.getContext("2d");
+      var eqLowKnob = document.getElementById("eqLowKnob"), eqLowKnobCtx = eqLowKnob.getContext("2d");
+      var eqMidKnob = document.getElementById("eqMidKnob"), eqMidKnobCtx = eqMidKnob.getContext("2d");
+      var eqHighKnob = document.getElementById("eqHighKnob"), eqHighKnobCtx = eqHighKnob.getContext("2d");
+
+      // --- Global Effects Chain Setup ---
+      function initGlobalEffects() {
+        if (!audioContext) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          masterGainNode = audioContext.createGain();
+          panNode = audioContext.createStereoPanner();
+          delayNode = audioContext.createDelay();
+          reverbNode = audioContext.createGain();
+          eqLowNode = audioContext.createBiquadFilter();
+          eqLowNode.type = "lowshelf";
+          eqLowNode.frequency.value = 200;
+          eqMidNode = audioContext.createBiquadFilter();
+          eqMidNode.type = "peaking";
+          eqMidNode.frequency.value = 1000;
+          eqHighNode = audioContext.createBiquadFilter();
+          eqHighNode.type = "highshelf";
+          eqHighNode.frequency.value = 3000;
+          masterGainNode.connect(analyser || (analyser = audioContext.createAnalyser()));
+          analyser.fftSize = 256;
+          bufferLength = analyser.frequencyBinCount;
+          dataArray = new Uint8Array(bufferLength);
+          analyser.connect(audioContext.destination);
+        }
+      }
+      function connectToEffects(audio, customAnalyser) {
+        var source = audioContext.createMediaElementSource(audio);
+        source.connect(panNode);
+        panNode.connect(delayNode);
+        delayNode.connect(reverbNode);
+        reverbNode.connect(eqLowNode);
+        eqLowNode.connect(eqMidNode);
+        eqMidNode.connect(eqHighNode);
+        eqHighNode.connect(masterGainNode);
+        if (customAnalyser) {
+          source.connect(customAnalyser);
+          customAnalyser.fftSize = 256;
+          customAnalyser.dataArray = new Uint8Array(customAnalyser.frequencyBinCount);
+          customAnalyser.connect(audioContext.destination);
+        }
+      }
+      // --- End Global Effects Chain Setup ---
+
+      // --- Knob Helper Functions ---
+      function drawKnob(ctx, angle) {
+        ctx.clearRect(0, 0, 50, 50);
+        ctx.beginPath();
+        ctx.arc(25, 25, 20, 0, 2 * Math.PI);
+        ctx.fillStyle = "#555";
+        ctx.fill();
+        ctx.strokeStyle = "#333";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.beginPath();
+        var rad = (angle - 90) * Math.PI / 180;
+        ctx.moveTo(25, 25);
+        ctx.lineTo(25 + 15 * Math.cos(rad), 25 + 15 * Math.sin(rad));
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      }
+      function getKnobAngleFromEvent(canvas, e) {
+        var rect = canvas.getBoundingClientRect();
+        var x = e.clientX - rect.left - 25;
+        var y = e.clientY - rect.top - 25;
+        var angle = Math.atan2(y, x) * 180 / Math.PI + 90;
+        if (angle < 0) angle += 360;
+        return angle;
+      }
+      // --- End Knob Helper Functions ---
+
+      // --- Global Volume Knob ---
+      var isVolumeDragging = false, volumeKnobAngle = 0;
+      function updateVolumeKnob() {
+        drawKnob(volumeKnobCtx, volumeKnobAngle);
+        globalVolume = 1 - ((volumeKnobAngle - 90 + 360) % 360) / 360;
+        if (masterGainNode) masterGainNode.gain.value = globalVolume;
+        updatePlayingVolumes();
+      }
+      volumeKnob.addEventListener("mousedown", function(e) {
+        isVolumeDragging = true;
+        volumeKnobAngle = getKnobAngleFromEvent(volumeKnob, e);
+        updateVolumeKnob();
+      });
+      volumeKnob.addEventListener("mousemove", function(e) {
+        if (!isVolumeDragging) return;
+        volumeKnobAngle = getKnobAngleFromEvent(volumeKnob, e);
+        updateVolumeKnob();
+      });
+      volumeKnob.addEventListener("mouseup", function() {
+        isVolumeDragging = false;
+        console.log("Global volume set to: " + globalVolume.toFixed(2));
+      });
+      volumeKnob.addEventListener("mouseleave", function() { isVolumeDragging = false; });
+      updateVolumeKnob();
+      function updatePlayingVolumes() {
+        if (!multiTrackMode && currentAudio) currentAudio.volume = globalVolume;
+        playingAudios.forEach(function(item) { item.audio.volume = globalVolume; });
+      }
+      // --- End Global Volume Knob ---
+
+      // --- Pan Knob ---
+      var isPanDragging = false, panKnobAngle = 180;
+      function updatePanKnob() {
+        drawKnob(panKnobCtx, panKnobAngle);
+        globalPan = ((180 - panKnobAngle) / 90);
+        if (panNode) panNode.pan.value = globalPan;
+      }
+      panKnob.addEventListener("mousedown", function(e) {
+        isPanDragging = true;
+        panKnobAngle = getKnobAngleFromEvent(panKnob, e);
+        updatePanKnob();
+      });
+      panKnob.addEventListener("mousemove", function(e) {
+        if (!isPanDragging) return;
+        panKnobAngle = getKnobAngleFromEvent(panKnob, e);
+        updatePanKnob();
+      });
+      panKnob.addEventListener("mouseup", function() {
+        isPanDragging = false;
+        console.log("Global pan set to: " + globalPan.toFixed(2));
+      });
+      panKnob.addEventListener("mouseleave", function() { isPanDragging = false; });
+      updatePanKnob();
+
+      // --- Delay Knob ---
+      var isDelayDragging = false, delayKnobAngle = 270;
+      function updateDelayKnob() {
+        drawKnob(delayKnobCtx, delayKnobAngle);
+        var normalized = (((270 - delayKnobAngle + 360) % 360)) / 180;
+        globalDelay = Math.max(0, Math.min(0.5, normalized * 0.5));
+        if (delayNode) delayNode.delayTime.value = globalDelay;
+      }
+      delayKnob.addEventListener("mousedown", function(e) {
+        isDelayDragging = true;
+        delayKnobAngle = getKnobAngleFromEvent(delayKnob, e);
+        updateDelayKnob();
+      });
+      delayKnob.addEventListener("mousemove", function(e) {
+        if (!isDelayDragging) return;
+        delayKnobAngle = getKnobAngleFromEvent(delayKnob, e);
+        updateDelayKnob();
+      });
+      delayKnob.addEventListener("mouseup", function() {
+        isDelayDragging = false;
+        console.log("Global delay set to: " + globalDelay.toFixed(2) + " sec");
+      });
+      delayKnob.addEventListener("mouseleave", function() { isDelayDragging = false; });
+      updateDelayKnob();
+
+      // --- Reverb Knob ---
+      var isReverbDragging = false, reverbKnobAngle = 270;
+      function updateReverbKnob() {
+        drawKnob(reverbKnobCtx, reverbKnobAngle);
+        var normalized = (((270 - reverbKnobAngle + 360) % 360)) / 180;
+        globalReverb = Math.max(0, Math.min(1, normalized));
+        if (reverbNode) reverbNode.gain.value = globalReverb;
+      }
+      reverbKnob.addEventListener("mousedown", function(e) {
+        isReverbDragging = true;
+        reverbKnobAngle = getKnobAngleFromEvent(reverbKnob, e);
+        updateReverbKnob();
+      });
+      reverbKnob.addEventListener("mousemove", function(e) {
+        if (!isReverbDragging) return;
+        reverbKnobAngle = getKnobAngleFromEvent(reverbKnob, e);
+        updateReverbKnob();
+      });
+      reverbKnob.addEventListener("mouseup", function() {
+        isReverbDragging = false;
+        console.log("Global reverb set to: " + globalReverb.toFixed(2));
+      });
+      reverbKnob.addEventListener("mouseleave", function() { isReverbDragging = false; });
+      updateReverbKnob();
+
+      // --- EQ Knobs (Low, Mid, High) ---
+      function updateEQKnob(ctx, knobAngle) {
+        drawKnob(ctx, knobAngle);
+        var normalized = ((knobAngle - 90 + 360) % 360) / 180;
+        return 12 - (normalized * 24);
+      }
+      var isEQLowDragging = false, isEQMidDragging = false, isEQHighDragging = false;
+      var eqLowKnobAngle = 180, eqMidKnobAngle = 180, eqHighKnobAngle = 180;
+      function updateEQLowKnob() {
+        eqLow = updateEQKnob(eqLowKnobCtx, eqLowKnobAngle);
+        if (eqLowNode) eqLowNode.gain.value = eqLow;
+      }
+      eqLowKnob.addEventListener("mousedown", function(e) {
+        isEQLowDragging = true;
+        eqLowKnobAngle = getKnobAngleFromEvent(eqLowKnob, e);
+        updateEQLowKnob();
+      });
+      eqLowKnob.addEventListener("mousemove", function(e) {
+        if (!isEQLowDragging) return;
+        eqLowKnobAngle = getKnobAngleFromEvent(eqLowKnob, e);
+        updateEQLowKnob();
+      });
+      eqLowKnob.addEventListener("mouseup", function() {
+        isEQLowDragging = false;
+        console.log("EQ Low set to: " + eqLow.toFixed(2) + " dB");
+      });
+      eqLowKnob.addEventListener("mouseleave", function() { isEQLowDragging = false; });
+      updateEQLowKnob();
+
+      function updateEQMidKnob() {
+        eqMid = updateEQKnob(eqMidKnobCtx, eqMidKnobAngle);
+        if (eqMidNode) eqMidNode.gain.value = eqMid;
+      }
+      eqMidKnob.addEventListener("mousedown", function(e) {
+        isEQMidDragging = true;
+        eqMidKnobAngle = getKnobAngleFromEvent(eqMidKnob, e);
+        updateEQMidKnob();
+      });
+      eqMidKnob.addEventListener("mousemove", function(e) {
+        if (!isEQMidDragging) return;
+        eqMidKnobAngle = getKnobAngleFromEvent(eqMidKnob, e);
+        updateEQMidKnob();
+      });
+      eqMidKnob.addEventListener("mouseup", function() {
+        isEQMidDragging = false;
+        console.log("EQ Mid set to: " + eqMid.toFixed(2) + " dB");
+      });
+      eqMidKnob.addEventListener("mouseleave", function() { isEQMidDragging = false; });
+      updateEQMidKnob();
+
+      function updateEQHighKnob() {
+        eqHigh = updateEQKnob(eqHighKnobCtx, eqHighKnobAngle);
+        if (eqHighNode) eqHighNode.gain.value = eqHigh;
+      }
+      eqHighKnob.addEventListener("mousedown", function(e) {
+        isEQHighDragging = true;
+        eqHighKnobAngle = getKnobAngleFromEvent(eqHighKnob, e);
+        updateEQHighKnob();
+      });
+      eqHighKnob.addEventListener("mousemove", function(e) {
+        if (!isEQHighDragging) return;
+        eqHighKnobAngle = getKnobAngleFromEvent(eqHighKnob, e);
+        updateEQHighKnob();
+      });
+      eqHighKnob.addEventListener("mouseup", function() {
+        isEQHighDragging = false;
+        console.log("EQ High set to: " + eqHigh.toFixed(2) + " dB");
+      });
+      eqHighKnob.addEventListener("mouseleave", function() { isEQHighDragging = false; });
+      updateEQHighKnob();
+      // --- End EQ Knobs ---
+
+      // --- Audio Visualization ---
+      function drawAudioGraph() {
+        requestAnimationFrame(drawAudioGraph);
+        canvasCtx.clearRect(0, 0, audioCanvas.width, audioCanvas.height);
+        if (multiTrackMode && playingAudios.length > 0) {
+          var segmentHeight = audioCanvas.height / playingAudios.length;
+          playingAudios.forEach(function(item, index) {
+            if (!item.analyser) return;
+            item.analyser.getByteTimeDomainData(item.dataArray);
+            canvasCtx.strokeStyle = getColorForIndex(index);
+            canvasCtx.lineWidth = 2;
+            canvasCtx.beginPath();
+            var sliceWidth = audioCanvas.width / bufferLength;
+            var x = 0;
+            for (var i = 0; i < bufferLength; i++) {
+              var v = item.dataArray[i] / 128.0;
+              var y = (v * (segmentHeight / 2)) + (index * segmentHeight);
+              if (i === 0) {
+                canvasCtx.moveTo(x, y);
+              } else {
+                canvasCtx.lineTo(x, y);
+              }
+              x += sliceWidth;
+            }
+            canvasCtx.stroke();
+          });
+        } else if (analyser) {
+          analyser.getByteTimeDomainData(dataArray);
+          canvasCtx.strokeStyle = "#0f0";
+          canvasCtx.lineWidth = 2;
+          canvasCtx.beginPath();
+          var sliceWidth = audioCanvas.width / bufferLength;
+          var x = 0;
+          for (var i = 0; i < bufferLength; i++) {
+            var v = dataArray[i] / 128.0;
+            var y = v * audioCanvas.height / 2;
+            if (i === 0) {
+              canvasCtx.moveTo(x, y);
+            } else {
+              canvasCtx.lineTo(x, y);
+            }
+            x += sliceWidth;
+          }
+          canvasCtx.stroke();
+        }
+      }
+      drawAudioGraph();
+      function getColorForIndex(index) {
+        var colors = ["#ff0000", "#00ff00", "#0000ff", "#ffff00", "#ff00ff", "#00ffff"];
+        return colors[index % colors.length];
+      }
+      // --- End Audio Visualization ---
+
+      // --- Help/Info Box Toggle ---
+      helpButton.addEventListener("click", function() {
+        if (helpBox.style.display === "none" || helpBox.style.display === "") {
+          helpBox.style.display = "block";
+          helpButton.textContent = "Hide Help";
+        } else {
+          helpBox.style.display = "none";
+          helpButton.textContent = "Help";
+        }
+      });
+      // --- End Help/Info Box Toggle ---
+
+      // --- Key Mapping & Search ---
+      document.addEventListener("keydown", function(e) {
+        var key = e.key.toLowerCase();
+        if (key === "r") { recordButton.click(); return; }
+        if (key === "m") { multiTrackButton.click(); return; }
+        if (key === "s") { syncTracksButton.click(); return; }
+        var pads = padContainer.getElementsByClassName("pad");
+        for (var i = 0; i < pads.length; i++) {
+          if (pads[i].getAttribute("data-key") === key) {
+            pads[i].click();
+            break;
+          }
+        }
+      });
+      searchInput.addEventListener("input", function() {
+        var filter = this.value.toLowerCase();
+        var pads = padContainer.getElementsByClassName("pad");
+        for (var i = 0; i < pads.length; i++) {
+          var title = pads[i].getAttribute("data-title").toLowerCase();
+          pads[i].style.display = title.indexOf(filter) !== -1 ? "flex" : "none";
+        }
+      });
+      // --- End Key Mapping & Search ---
+
+      themeSelect.addEventListener("change", function() {
+        var pads = padContainer.getElementsByClassName("pad");
+        for (var i = 0; i < pads.length; i++) {
+          if (!pads[i].classList.contains("saved-pad")) {
+            pads[i].style.backgroundColor = getPadColor();
+          }
+        }
+      });
+
+      // --- Solo/Mute Management ---
+      var soloedPads = new Set();
+      function updateSoloStates() {
+        if (soloedPads.size > 0) {
+          playingAudios.forEach(function(item) {
+            if (!soloedPads.has(item.pad)) {
+              item.audio.muted = true;
+            } else {
+              item.audio.muted = false;
+            }
+          });
+          if (currentPad && !soloedPads.has(currentPad)) {
+            currentAudio.muted = true;
+          } else if (currentAudio) {
+            currentAudio.muted = false;
+          }
+        } else {
+          playingAudios.forEach(function(item) { item.audio.muted = false; });
+          if (currentAudio) currentAudio.muted = false;
+        }
+      }
+      // --- End Solo/Mute Management ---
+
+      // --- Pad Creation ---
+      function createPad(filename, index) {
+        var pad = document.createElement("div");
+        pad.className = "pad";
+        pad.setAttribute("draggable", "true");
+        pad.setAttribute("data-title", filename);
+        pad.setAttribute("data-key", keyMap[index] || "");
+        var label = document.createElement("span");
+        label.className = "pad-label";
+        var textSpan = document.createElement("span");
+        textSpan.textContent = filename;
+        label.appendChild(textSpan);
+        pad.appendChild(label);
+        var soloBtn = document.createElement("button");
+        soloBtn.className = "soloButton";
+        soloBtn.textContent = "Solo";
+        soloBtn.addEventListener("click", function(e) {
+          e.stopPropagation();
+          if (soloedPads.has(pad)) {
+            soloedPads.delete(pad);
+            soloBtn.textContent = "Solo";
+          } else {
+            soloedPads.add(pad);
+            soloBtn.textContent = "Mute";
+          }
+          updateSoloStates();
+        });
+        pad.appendChild(soloBtn);
+        pad.style.backgroundColor = getPadColor();
+        pad.addEventListener("click", function() {
+          var now = Date.now();
+          if (pad === currentPad && currentAudio) {
+            var timeDiff = now - lastTapTime;
+            if (timeDiff < 1500) {
+              currentAudio.currentTime = 0;
+              currentAudio.play();
+              lastTapTime = now;
+              if (isRecording) {
+                recordingSequence.push({ filename: filename, delay: now - recordingStartTime });
+              }
+              return;
+            } else {
+              currentAudio.pause();
+              currentAudio.currentTime = 0;
+              pad.classList.remove("active");
+              currentAudio = null;
+              currentPad = null;
+              return;
+            }
+          }
+          if (multiTrackMode) {
+            var existing = playingAudios.find(function(item) { return item.pad === pad; });
+            if (existing) {
+              var timeDiff = now - lastTapTime;
+              if (timeDiff < 1500) {
+                existing.audio.currentTime = 0;
+                existing.audio.play();
+                lastTapTime = now;
+                if (isRecording) {
+                  recordingSequence.push({ filename: filename, delay: now - recordingStartTime });
+                }
+                return;
+              } else {
+                existing.audio.pause();
+                existing.audio.currentTime = 0;
+                pad.classList.remove("active");
+                playingAudios = playingAudios.filter(function(item) { return item !== existing; });
+                return;
+              }
+            }
+          }
+          if (!multiTrackMode && currentAudio) {
+            currentAudio.pause();
+            currentAudio.currentTime = 0;
+            if (currentPad) currentPad.classList.remove("active");
+          }
+          var audio = new Audio(filename);
+          audio.volume = globalVolume;
+          audio.loop = isRepeating;
+          if (!audioContext) { initGlobalEffects(); }
+          var customAnalyser = null;
+          if (multiTrackMode) {
+            customAnalyser = audioContext.createAnalyser();
+            customAnalyser.fftSize = 256;
+            customAnalyser.dataArray = new Uint8Array(customAnalyser.frequencyBinCount);
+          }
+          connectToEffects(audio, customAnalyser);
+          audio.play();
+          pad.classList.add("active");
+          if (!multiTrackMode) {
+            currentAudio = audio;
+            currentPad = pad;
+          } else {
+            playingAudios.push({ pad: pad, audio: audio, analyser: customAnalyser, dataArray: customAnalyser.dataArray });
+          }
+          lastTapTime = now;
+          if (isRecording) {
+            recordingSequence.push({ filename: filename, delay: now - recordingStartTime });
+          }
+          audio.addEventListener("ended", function() {
+            pad.classList.remove("active");
+            if (!multiTrackMode) {
+              currentAudio = null;
+              currentPad = null;
+            } else {
+              playingAudios = playingAudios.filter(function(item) { return item.audio !== audio; });
+            }
+          });
+        });
+        pad.addEventListener("dragstart", function(e) {
+          pad.classList.add("dragging");
+          e.dataTransfer.setData("text/plain", index);
+        });
+        pad.addEventListener("dragend", function() { pad.classList.remove("dragging"); });
+        pad.addEventListener("dragover", function(e) { e.preventDefault(); });
+        pad.addEventListener("drop", function(e) {
+          e.preventDefault();
+          var draggedIndex = e.dataTransfer.getData("text/plain");
+          var draggedPad = padContainer.children[draggedIndex];
+          if (draggedPad && draggedPad !== pad) {
+            padContainer.insertBefore(draggedPad, pad);
+          }
+        });
+        padContainer.appendChild(pad);
+      }
+      function initPads() {
+        padContainer.innerHTML = "";
+        mp3Files.forEach(function(file, index) { createPad(file, index); });
+        console.log("Pads initialized:", mp3Files.length);
+      }
+      initPads();
+      // --- End Pad Creation ---
+
+      // --- Saved Recordings ---
+      function createSavedPad(recording, index) {
+        var pad = document.createElement("div");
+        pad.className = "pad saved-pad";
+        pad.setAttribute("data-title", recording.name);
+        var label = document.createElement("span");
+        label.className = "pad-label";
+        var textSpan = document.createElement("span");
+        textSpan.textContent = recording.name;
+        label.appendChild(textSpan);
+        pad.appendChild(label);
+        pad.addEventListener("click", function() {
+          if (pad.classList.contains("active")) {
+            pad.classList.remove("active");
+            return;
+          }
+          pad.classList.add("active");
+          playSavedRecording(recording.sequence, function() {
+            pad.classList.remove("active");
+          });
+        });
+        savedRecordingsContainer.appendChild(pad);
+      }
+      function updateSavedRecordingsUI() {
+        savedRecordingsContainer.innerHTML = "";
+        if (savedRecordings.length === 0) {
+          savedRecordingsContainer.textContent = "No saved recordings.";
+          return;
+        }
+        savedRecordings.forEach(function(recording, idx) { createSavedPad(recording, idx); });
+      }
+      function playSavedRecording(sequence, onComplete) {
+        if (sequence.length === 0) return;
+        var timeouts = [];
+        sequence.forEach(function(event) {
+          var timeoutId = setTimeout(function() {
+            var pads = padContainer.getElementsByClassName("pad");
+            for (var i = 0; i < pads.length; i++) {
+              if (pads[i].getAttribute("data-title") === event.filename) {
+                pads[i].click();
+                break;
+              }
+            }
+          }, event.delay);
+          timeouts.push(timeoutId);
+        });
+        setTimeout(function() { onComplete(); }, sequence[sequence.length - 1].delay + 500);
+      }
+      // --- End Saved Recordings ---
+
+      // --- Key Mapping & Search ---
+      document.addEventListener("keydown", function(e) {
+        var key = e.key.toLowerCase();
+        if (key === "r") { recordButton.click(); return; }
+        if (key === "m") { multiTrackButton.click(); return; }
+        if (key === "s") { syncTracksButton.click(); return; }
+        var pads = padContainer.getElementsByClassName("pad");
+        for (var i = 0; i < pads.length; i++) {
+          if (pads[i].getAttribute("data-key") === key) {
+            pads[i].click();
+            break;
+          }
+        }
+      });
+      searchInput.addEventListener("input", function() {
+        var filter = this.value.toLowerCase();
+        var pads = padContainer.getElementsByClassName("pad");
+        for (var i = 0; i < pads.length; i++) {
+          var title = pads[i].getAttribute("data-title").toLowerCase();
+          pads[i].style.display = title.indexOf(filter) !== -1 ? "flex" : "none";
+        }
+      });
+      // --- End Key Mapping & Search ---
+
+      themeSelect.addEventListener("change", function() {
+        var pads = padContainer.getElementsByClassName("pad");
+        for (var i = 0; i < pads.length; i++) {
+          if (!pads[i].classList.contains("saved-pad")) {
+            pads[i].style.backgroundColor = getPadColor();
+          }
+        }
+      });
+
+      // --- Solo/Mute Management ---
+      var soloedPads = new Set();
+      function updateSoloStates() {
+        if (soloedPads.size > 0) {
+          playingAudios.forEach(function(item) {
+            if (!soloedPads.has(item.pad)) {
+              item.audio.muted = true;
+            } else {
+              item.audio.muted = false;
+            }
+          });
+          if (currentPad && !soloedPads.has(currentPad)) {
+            currentAudio.muted = true;
+          } else if (currentAudio) {
+            currentAudio.muted = false;
+          }
+        } else {
+          playingAudios.forEach(function(item) { item.audio.muted = false; });
+          if (currentAudio) currentAudio.muted = false;
+        }
+      }
+      // --- End Solo/Mute Management ---
+
+      multiTrackButton.addEventListener("click", function() {
+        multiTrackMode = !multiTrackMode;
+        this.textContent = "Multi-Track: " + (multiTrackMode ? "On" : "Off");
+        if (!multiTrackMode) {
+          playingAudios.forEach(function(item) {
+            item.audio.pause();
+            item.audio.currentTime = 0;
+            item.pad.classList.remove("active");
+          });
+          playingAudios = [];
+        }
+      });
+      syncTracksButton.addEventListener("click", function() {
+        if (multiTrackMode && playingAudios.length > 0) {
+          playingAudios.forEach(function(item) {
+            item.audio.pause();
+            item.audio.currentTime = 0;
+            item.audio.play();
+          });
+        }
+      });
+      recordButton.addEventListener("click", function() {
+        if (!isRecording) {
+          isRecording = true;
+          recordingSequence = [];
+          recordingStartTime = Date.now();
+          recordIndicator.textContent = "Recording...";
+          recordButton.textContent = "Stop Recording";
+        } else {
+          isRecording = false;
+          recordIndicator.textContent = "";
+          recordButton.textContent = "Record";
+          console.log("Recorded sequence:", recordingSequence);
+          if (recordingSequence.length > 0) {
+            var name = prompt("Enter a name for this recording:");
+            if (name) {
+              savedRecordings.push({ name: name, sequence: recordingSequence.slice() });
+              updateSavedRecordingsUI();
+            }
+          }
+        }
+      });
+
+      // --- Initialize Pads and Saved Recordings ---
+      initPads();
+      updateSavedRecordingsUI();
+      // --- End Initialization ---
+    })();
+  </script>
+</body>
+</html>
