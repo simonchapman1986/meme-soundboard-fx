@@ -93,6 +93,3 @@ Contributions are welcome! Please feel free to fork the repository and submit pu
 ## License
 
 This project is licensed under the MIT License.
-```
-
-Feel free to customize the content as needed for your repository and personal preferences.
